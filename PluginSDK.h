@@ -337,6 +337,8 @@ public:
 	virtual float PrimaryARRegenRateRep() = 0;
 	virtual float SecondaryARRegenRateRep() = 0;
 	virtual float SecondaryARBaseRegenRateRep() = 0;
+	
+	virtual int CampNumber() = 0;
 };
 
 class IObjectManager
