@@ -16,8 +16,27 @@
 #include "PluginSDK_Enums.h"
 #include "Vector.h"
 
+/*	About plugin system:
+	- Plugins can export these entries to make system more readable:
+		- PLUGIN_API const char PLUGIN_PRINT_NAME[32] = "ReadableName";
+		- PLUGIN_API const char PLUGIN_PRINT_AUTHOR[32] = "Spacebar";
+		- PLUGIN_API ChampionId PLUGIN_TARGET_CHAMP = ChampionId::Unknown;
+		First two are used for printing readable stuff in the menu.
+		Champion target is used for filtering out unwated scripts,
+		if exported and different than 0 the script will only show up
+		on the list on correct champion.
+	
+	- Plugins are also expected to export and implement these two functions:
+		- PLUGIN_API bool OnLoadSDK(IPluginsSDK* plugin_sdk);
+		- PLUGIN_API void OnUnloadSDK();
+
+	- Plugin MUST export SDK target version (PLUGIN_SDK_VERSION define)
+	  under name PLUGIN_TARGET_SDK, but that should be done automatically
+	  via PluginSDK.cpp. Plugins will be ignored in case of mismatch.
+*/
+
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 13
+#define PLUGIN_SDK_VERSION 15
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
         g_PluginSDK         = PLUGIN_SDK; \
@@ -33,13 +52,16 @@
 		g_Common			= PLUGIN_SDK->GetCommon(); \
 		g_ChampionManager   = PLUGIN_SDK->GetChampionManager();\
 		g_HealthPrediction  = PLUGIN_SDK->GetHealthPrediction();\
-		g_ItemManager		= PLUGIN_SDK->GetItemManager();
+		g_ItemManager		= PLUGIN_SDK->GetItemManager();\
+		g_Log				= PLUGIN_SDK->GetLogSystem();
 
 #define RGBA(r, g, b, a) ((a << 24) | (b << 16) | (g << 8) | r)
 
 bool StringContains(const char* strA, const char* strB, bool ignore_case = FALSE);
 bool StringEquals(const char* strA, const char* strB, bool ignore_case = FALSE);
 
+#pragma warning( push )
+#pragma warning( disable : 4018)
 constexpr uint32_t inline const hash(const char* str)
 {
 	uint32_t hash = 0x811C9DC5;
@@ -61,6 +83,7 @@ constexpr uint32_t inline const hash(const char* str)
 
 	return hash;
 }
+#pragma warning( pop ) 
 
 struct IPerk;
 struct ISpellData;
@@ -571,10 +594,13 @@ public:
 	virtual void ResetAA() = 0;
 	virtual void MoveTo(Vector const& position) = 0;
 	virtual void Orbwalk(IGameObject* target, Vector const& position) = 0;
+	
 	virtual void SetAttack(bool enable) = 0;
 	virtual void SetMovement(bool enable) = 0;
+	
 	virtual void SetOrbwalkingTarget(IGameObject* unit) = 0;
 	virtual void SetOrbwalkingPoint(Vector const& position) = 0;
+	virtual void SetOrbwalkingMode(eOrbwalkingMode mode) = 0;
 	
 	bool IsModeActive(eOrbwalkingMode mode)
 	{
@@ -586,24 +612,34 @@ public:
 class IMenuElement
 {
 public:
-	virtual bool GetBool() = 0;
-	virtual int  GetInt() = 0;
-
 	virtual std::string GetKey() = 0;
 	virtual std::string GetDisplayName() = 0;
+	virtual bool GetVisibilty() = 0;
+
+	virtual bool GetBool() = 0;
+	virtual int GetInt() = 0;
+	virtual uint32_t GetColor() = 0;
 
 	virtual void SetDisplayName(std::string const& display_name) = 0;
+	virtual void SetVisibilty(bool const& _value) = 0;
 
-	virtual uint32_t GetColor() = 0;
+	virtual void SetBool(bool const& _value) = 0;
+	virtual void SetInt(int const& _value) = 0;
+	virtual void SetColor(uint32_t const& _value) = 0;
 };
 
 class IMenu
 {
 public:
-	virtual IMenuElement* AddSlider(std::string const& display_name, std::string const& key, int default_value, int min_value, int max_value) = 0;
-	virtual IMenuElement* AddCheckBox(std::string const& display_name, std::string const& key, bool default_value) = 0;
-	virtual IMenuElement* AddKeybind(std::string const& display_name, std::string const& key, int vkey, bool default_value, KeybindType type) = 0;
-	virtual IMenuElement* AddComboBox(std::string const& display_name, std::string const& key, std::vector<std::string> const& names, int default_value) = 0;
+	virtual void Remove() = 0;
+	
+	virtual IMenuElement* AddSlider(std::string const& display_name, std::string const& key, int default_value, int min_value, int max_value, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddCheckBox(std::string const& display_name, std::string const& key, bool default_value, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddKeybind(std::string const& display_name, std::string const& key, int vkey, bool default_value, KeybindType type, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddComboBox(std::string const& display_name, std::string const& key, std::vector<std::string> const& names, int default_value, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddColorPicker(std::string const& display_name, std::string const& key, float r, float g, float b, float a, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddLabel(std::string const& display_name, std::string const& key, bool visible_in_menu = true) = 0;
+
 	virtual IMenuElement* GetElement(std::string const& key) = 0;
 	virtual IMenuElement* operator[](std::string const& key) = 0;
 
@@ -611,10 +647,7 @@ public:
 	virtual IMenu* GetSubMenu(std::string const& key) = 0;
 
 	virtual std::vector<IMenuElement*> GetElements() = 0;
-	virtual void Remove() = 0;
-	virtual bool ElementExists(std::string const& key) = 0;
-	virtual IMenuElement* AddColorPicker(std::string const& display_name, std::string const& key, float r, float g, float b, float a) = 0;
-};
+	virtual bool ElementExists(std::string const& key) = 0;};
 
 class IMainMenu
 {
@@ -641,8 +674,6 @@ public:
 	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageInput* input) = 0;
 	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageType damage_type, float raw_damage) = 0;
 	virtual float GetSpellDamage(IGameObject* from, IGameObject* target, SpellSlot slot, bool return_raw_damage) = 0;
-
-	virtual void Log(const char* _fmt, ...) = 0;
 
 	virtual void DelayAction(int time, std::function<void()> function) = 0;
 
@@ -679,6 +710,9 @@ public:
 
 	virtual void ApplyGlow(IGameObject* object, int r, int g, int b, int a, int thickness, int blur) = 0;
 	virtual void ApplyGlow(IGameObject* object, unsigned int color, int thickness, int blur) = 0;
+
+	// DEPRECATED, provided for compatibility
+	void Log(const char* _fmt, ...);
 };
 
 class ISpell
@@ -738,6 +772,20 @@ public:
 	virtual void SetCharged(float range_min, float range_max, float charge_duration) = 0;
 };
 
+class ILogSystem
+{
+public:
+	virtual void ToggleOutputToFile(bool _log_to_file) = 0;
+	
+	virtual void Print(const char* _fmt, ...) = 0;
+	virtual void Print(uint32_t _color, const char* _fmt, ...) = 0;
+	virtual void PrintToFile(const char* _fmt, ...) = 0;
+	
+	virtual void PrintVA(const char* _fmt, va_list _va) = 0;
+	virtual void PrintVA(uint32_t _color, const char* _fmt, va_list _va) = 0;
+	virtual void PrintToFileVA(const char* _fmt, va_list _va) = 0;
+};
+
 class IPluginsSDK
 {
 public:
@@ -753,6 +801,7 @@ public:
 	virtual IChampionManager* GetChampionManager() = 0;
 	virtual IHealthPrediction* GetHealthPrediction() = 0;
 	virtual IItemManager* GetItemManager() = 0;
+	virtual ILogSystem* GetLogSystem() = 0;
 
 	/// <summary>
 	/// Returns spell for easier casting, running prediction etc. You need to delete that instance in OnUnloadSDK callback
@@ -769,6 +818,9 @@ public:
 
 	virtual void AddEventHandler(Events e, void* callback) = 0;
 	virtual void RemoveEventHandler(Events e, void* callback) = 0;
+
+	virtual void SetPluginName(const char* _name) = 0;
+	virtual void SetPluginAuthor(const char* _name) = 0;
 };
 
 struct IHeroStats
@@ -969,3 +1021,4 @@ extern ICommon* g_Common;
 extern IChampionManager* g_ChampionManager;
 extern IHealthPrediction* g_HealthPrediction;
 extern IItemManager* g_ItemManager;
+extern ILogSystem* g_Log;

@@ -15,13 +15,13 @@ ICommon* g_Common = nullptr;
 IChampionManager* g_ChampionManager = nullptr;
 IHealthPrediction* g_HealthPrediction = nullptr;
 IItemManager* g_ItemManager = nullptr;
+ILogSystem* g_Log = nullptr;
+
+// Default empty entrypoint
 int __stdcall DllMain(void*, unsigned long, void*) { return 1; }
 
-// Used to print warnings when plugin dll uses SDK version that doesn't match SDK version inside the core.
-PLUGIN_API int GetSDKVersion()
-{
-	return PLUGIN_SDK_VERSION;
-}
+// Plugin won't load in case of mismatch
+PLUGIN_API std::int32_t	PLUGIN_TARGET_SDK = PLUGIN_SDK_VERSION;
 
 bool StringContains(const char * strA, const char * strB, bool ignore_case)
 {
@@ -49,4 +49,12 @@ bool StringEquals(const char * strA, const char * strB, bool ignore_case)
 		return strcmp(strA, strB) == 0;
 
 	return strlen(strA) == strlen(strB) && _stricmp(strA, strB) == 0;
+}
+
+void ICommon::Log(const char* _fmt, ...)
+{
+	va_list va;
+	va_start(va, _fmt);
+	g_Log->PrintVA(_fmt, va);
+	va_end(va);
 }
