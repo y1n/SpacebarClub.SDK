@@ -909,6 +909,9 @@ struct ISpellData
     std::array<float, 6> ManaCost;
 
     SpellTargeting TargetingType;
+
+	float CastFrame;
+	bool IgnoreAnimContinueUntilCastFrame;
 };
 
 struct ICharacterData
