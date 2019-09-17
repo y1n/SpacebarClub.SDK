@@ -36,7 +36,7 @@
 */
 
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 15
+#define PLUGIN_SDK_VERSION 16
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
         g_PluginSDK         = PLUGIN_SDK; \
