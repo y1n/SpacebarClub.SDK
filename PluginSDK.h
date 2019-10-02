@@ -36,7 +36,7 @@
 */
 
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 16
+#define PLUGIN_SDK_VERSION 17
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
         g_PluginSDK         = PLUGIN_SDK; \
@@ -362,6 +362,7 @@ public:
 	virtual float SecondaryARBaseRegenRateRep() = 0;
 	
 	virtual int CampNumber() = 0;
+	virtual void SetVisibilityOverride(bool visible) = 0;
 };
 
 class IObjectManager

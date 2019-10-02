@@ -120,8 +120,9 @@ struct OnPreCreateObjectEventArgs
 
 struct OnPlayAnimationEventArgs
 {
-    std::string AnimationName;
-    bool Process;
+	std::string AnimationName;
+	int AnimationHash;
+	bool Process;
 };
 
 struct OnUpdateChargeableSpellEventArgs
