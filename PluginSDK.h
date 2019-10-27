@@ -15,45 +15,46 @@
 
 #include "PluginSDK_Enums.h"
 #include "Vector.h"
+#include "Geometry.h"
 
-/*	About plugin system:
-	- Plugins can export these entries to make system more readable:
-		- PLUGIN_API const char PLUGIN_PRINT_NAME[32] = "ReadableName";
-		- PLUGIN_API const char PLUGIN_PRINT_AUTHOR[32] = "Spacebar";
-		- PLUGIN_API ChampionId PLUGIN_TARGET_CHAMP = ChampionId::Unknown;
-		First two are used for printing readable stuff in the menu.
-		Champion target is used for filtering out unwated scripts,
-		if exported and different than 0 the script will only show up
-		on the list on correct champion.
+/*		About plugin system:
+	 - Plugins can export these entries to make system more readable:
+	 - PLUGIN_API const char PLUGIN_PRINT_NAME[32] = "ReadableName";
+	 - PLUGIN_API const char PLUGIN_PRINT_AUTHOR[32] = "Spacebar";
+	 - PLUGIN_API ChampionId PLUGIN_TARGET_CHAMP = ChampionId::Unknown;
+	   First two are used for printing readable stuff in the menu.
+	   Champion target is used for filtering out unwated plugins,
+	   if exported and different than 0 the plugins will only show up
+	   on the list on correct champion.
 	
-	- Plugins are also expected to export and implement these two functions:
-		- PLUGIN_API bool OnLoadSDK(IPluginsSDK* plugin_sdk);
-		- PLUGIN_API void OnUnloadSDK();
-
-	- Plugin MUST export SDK target version (PLUGIN_SDK_VERSION define)
-	  under name PLUGIN_TARGET_SDK, but that should be done automatically
-	  via PluginSDK.cpp. Plugins will be ignored in case of mismatch.
+	 - Plugins are also expected to export and implement these two functions:
+	 - PLUGIN_API bool OnLoadSDK(IPluginsSDK* plugin_sdk);
+	 - PLUGIN_API void OnUnloadSDK();
+	
+	 - Plugin MUST export SDK target version (PLUGIN_SDK_VERSION define)
+	   under name PLUGIN_TARGET_SDK, but that should be done automatically
+	   via PluginSDK.cpp. Plugins will be ignored in case of mismatch.
 */
 
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 17
+#define PLUGIN_SDK_VERSION 18
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
-        g_PluginSDK         = PLUGIN_SDK; \
-        g_ObjectManager     = PLUGIN_SDK->GetObjectManager(); \
-		g_LocalPlayer       = PLUGIN_SDK->GetObjectManager()->GetLocalPlayer(); \
-        g_Camera            = PLUGIN_SDK->GetCamera(); \
-        g_NavMesh           = PLUGIN_SDK->GetNavMesh(); \
-        g_Renderer          = PLUGIN_SDK->GetRenderer(); \
-        g_Shop              = PLUGIN_SDK->GetShop(); \
-        g_Drawing           = PLUGIN_SDK->GetDrawing(); \
-        g_Menu              = PLUGIN_SDK->GetMainMenu(); \
-        g_Orbwalker         = PLUGIN_SDK->GetOrbwalker(); \
-		g_Common			= PLUGIN_SDK->GetCommon(); \
-		g_ChampionManager   = PLUGIN_SDK->GetChampionManager();\
-		g_HealthPrediction  = PLUGIN_SDK->GetHealthPrediction();\
-		g_ItemManager		= PLUGIN_SDK->GetItemManager();\
-		g_Log				= PLUGIN_SDK->GetLogSystem();
+	g_PluginSDK         = PLUGIN_SDK; \
+	g_ObjectManager     = PLUGIN_SDK->GetObjectManager(); \
+	g_LocalPlayer       = PLUGIN_SDK->GetObjectManager()->GetLocalPlayer(); \
+	g_Camera            = PLUGIN_SDK->GetCamera(); \
+	g_NavMesh           = PLUGIN_SDK->GetNavMesh(); \
+	g_Renderer          = PLUGIN_SDK->GetRenderer(); \
+	g_Shop              = PLUGIN_SDK->GetShop(); \
+	g_Drawing           = PLUGIN_SDK->GetDrawing(); \
+	g_Menu              = PLUGIN_SDK->GetMainMenu(); \
+	g_Orbwalker         = PLUGIN_SDK->GetOrbwalker(); \
+	g_Common			= PLUGIN_SDK->GetCommon(); \
+	g_ChampionManager   = PLUGIN_SDK->GetChampionManager();\
+	g_HealthPrediction  = PLUGIN_SDK->GetHealthPrediction();\
+	g_ItemManager		= PLUGIN_SDK->GetItemManager();\
+	g_Log				= PLUGIN_SDK->GetLogSystem();
 
 #define RGBA(r, g, b, a) ((a << 24) | (b << 16) | (g << 8) | r)
 
@@ -62,6 +63,7 @@ bool StringEquals(const char* strA, const char* strB, bool ignore_case = FALSE);
 
 #pragma warning( push )
 #pragma warning( disable : 4018)
+// FNV hash algorithm, use for buffs
 constexpr uint32_t inline const hash(const char* str)
 {
 	uint32_t hash = 0x811C9DC5;
@@ -85,10 +87,10 @@ constexpr uint32_t inline const hash(const char* str)
 }
 #pragma warning( pop ) 
 
+class IGameObject;
 struct IPerk;
 struct ISpellData;
 struct IItemData;
-struct IBuffInstance;
 struct ICharacterData;
 struct IHeroStats;
 class ISpellbook;
@@ -100,6 +102,31 @@ struct ISkinInfo;
 struct IDashData;
 struct IItemBuildInfo;
 struct IRecommendedItemInfo;
+class ISpell;
+
+struct IBuffInstance
+{
+	std::string Name;
+	std::string DisplayName;
+
+	bool Valid;
+	bool Alive;
+	bool Permanent;
+
+	float RemainingTime;
+	int Count;
+	int MaxCount;
+
+	IGameObject* Caster;
+	IGameObject* Owner;
+
+	BuffType Type;
+
+	float StartTime;
+	float EndTime;
+
+	uint32_t NameHash;
+};
 
 class IGameObject
 {
@@ -120,7 +147,7 @@ public:
 	virtual Vector ServerPosition() = 0;
 	virtual Vector LeashedPosition() = 0;
 	virtual Vector Velocity() = 0;
-	virtual Vector HealthBarPosition() = 0;
+	virtual Vector2 HealthBarPosition() = 0;
 	virtual Vector DirectionPerpendicular() = 0;
 	virtual Vector Direction() = 0;
 	virtual Vector PathingDirection() = 0;
@@ -158,9 +185,6 @@ public:
 	virtual bool IsNexus() = 0;
 	virtual bool IsInhibitor() = 0;
 	virtual bool IsMonsterRenderedOnMinimap() = 0;
-	virtual bool IsStealthed() = 0;
-	virtual bool IsImmovable() = 0;
-	virtual bool IsGhosted() = 0;
 	virtual bool IsRecalling() = 0;
 	virtual bool InFountain() = 0;
 	virtual bool IsWindingUp() = 0;
@@ -169,16 +193,22 @@ public:
 	virtual bool IsMagicImmune() = 0;
 	virtual bool IsLifestealImmune() = 0;
 	virtual bool IsTargetable() = 0;
-	virtual bool CanAttack() = 0;
-	virtual bool CanMove() = 0;
-	virtual bool CanCast() = 0;
 
+	virtual bool IsEpicMonster() = 0;
+	virtual bool IsJungleBuff() = 0;
+	virtual bool IsLaneMinion() = 0;
+
+	// GetBuffList method is slow, you should use methods with buff_hash, unless necessary!
 	virtual std::vector<IBuffInstance> GetBuffList() = 0;
 	virtual IBuffInstance GetBuff(const uint32_t buff_hash) = 0;
-
 	virtual bool HasBuff(const uint32_t buff_hash) = 0;
 	virtual bool HasBuffOfType(BuffType buffType) = 0;
 	virtual float BuffTimeLeft(const uint32_t buff_hash) = 0;
+
+	// Wrappers for easier usage
+	__forceinline IBuffInstance GetBuff(const char* BuffName) { return GetBuff(hash(BuffName)); }
+	__forceinline bool HasBuff(const char* BuffName) { return HasBuff(hash(BuffName)); }
+	__forceinline bool BuffTimeLeft(const char* BuffName) { return BuffTimeLeft(hash(BuffName)); }
 
 	virtual bool HasPerk(std::string const& perk_name) = 0;
 	virtual bool HasPerk(int32_t perk_id) = 0;
@@ -227,7 +257,8 @@ public:
 
 	virtual void SetName(std::string const& name) = 0;
 	virtual void SetSkinModel(std::string const& model, int skin_id) = 0;
-	virtual void SetSkin(int skin, std::string const& model) = 0;
+	virtual void SetSkin(int skin_id, std::string const& model) = 0;
+	virtual int GetSkinId() = 0;
 
 	virtual bool LevelUpSpell(SpellSlot spell_slot) = 0;
 	virtual bool GetItemSpellSlot(ItemId item_id, SpellSlot& out_slot) = 0;
@@ -270,7 +301,6 @@ public:
 	virtual IAvatar* GetAvatar() = 0;
 	virtual IHeroStats GetHeroStats() = 0;
 	virtual IGameObject* GetOwner() = 0;
-	virtual eActionState ActionState() = 0;
 
 	virtual std::vector<Vector> CreatePath(Vector const& end, bool smooth_path) = 0;
 	virtual std::vector<Vector> CreatePath(Vector const& start, Vector const& end, bool smooth_path) = 0;
@@ -360,9 +390,30 @@ public:
 	virtual float PrimaryARRegenRateRep() = 0;
 	virtual float SecondaryARRegenRateRep() = 0;
 	virtual float SecondaryARBaseRegenRateRep() = 0;
-	
+
 	virtual int CampNumber() = 0;
 	virtual void SetVisibilityOverride(bool visible) = 0;
+
+	// CharacterState
+	virtual bool CanAttack() = 0;
+	virtual bool CanMove() = 0;
+	virtual bool CanCast() = 0;
+	virtual bool IsImmovable() = 0;
+	virtual bool IsSelectable() = 0;
+	virtual bool IsCritImmune() = 0;
+	virtual bool IsUnkillable() = 0;
+	virtual bool IsRooted() = 0;
+	virtual bool IsStunned() = 0;
+	virtual bool IsGrounded() = 0;
+	virtual bool IsStealthed() = 0;
+	virtual bool IsObscured() = 0;
+	virtual bool IsFleeing() = 0;
+	virtual bool IsCharmed() = 0;
+	virtual bool IsSuppressed() = 0;
+	virtual bool IsFeared() = 0;
+	virtual bool IsAsleep() = 0;
+	virtual bool IsSlowed() = 0;
+	virtual bool IsGhosted() = 0;
 };
 
 class IObjectManager
@@ -567,7 +618,7 @@ public:
 	void virtual AddTextOnScreen(Vector2 const& point, DWORD color, text_flags flags, int font_size, const char* format, ...) = 0;
 	void virtual AddLine(Vector const& start, Vector const& end, DWORD color, float thickness = 1.0f) = 0;
 	void virtual AddLineOnScreen(Vector2 const& start, Vector2 const& end, DWORD color, float thickness = 1.0f) = 0;
-	void virtual AddCircle(Vector const& center, float radius, DWORD color, float thickness = 1.0f, int num_segments = 200) = 0;
+	void virtual AddCircle(Vector const& center, float radius, DWORD color, float thickness = 1.0f, int num_segments = 120) = 0;
 	void virtual AddImage(uintptr_t* user_texture_id, const Vector2& pos, const Vector2& size, float rounding = 0.0f, const Vector2& uv0 = Vector2(0, 0), const Vector2& uv1 = Vector2(1, 1), const Vector4& tint_col = Vector4(1, 1, 1, 1), const Vector4& border_col = Vector4(0, 0, 0, 0)) = 0;
 	void virtual AddRectOnScreen(const Vector2& pos, const Vector2& size, DWORD color) = 0;
 	void virtual AddFilledRectOnScreen(const Vector2& pos, const Vector2& size, DWORD color) = 0;
@@ -595,16 +646,18 @@ public:
 	virtual void ResetAA() = 0;
 	virtual void MoveTo(Vector const& position) = 0;
 	virtual void Orbwalk(IGameObject* target, Vector const& position) = 0;
-	
+
 	virtual void SetAttack(bool enable) = 0;
 	virtual void SetMovement(bool enable) = 0;
-	
+
 	virtual void SetOrbwalkingTarget(IGameObject* unit) = 0;
 	virtual void SetOrbwalkingPoint(Vector const& position) = 0;
 	virtual void SetOrbwalkingMode(eOrbwalkingMode mode) = 0;
-	
+
 	bool IsModeActive(eOrbwalkingMode mode)
 	{
+		if (mode == eOrbwalkingMode::kModeNone)
+			return GetOrbwalkingMode() == 0;
 		const auto t = static_cast<int>(mode);
 		return (GetOrbwalkingMode() & t) == t;
 	}
@@ -620,6 +673,7 @@ public:
 	virtual bool GetBool() = 0;
 	virtual int GetInt() = 0;
 	virtual uint32_t GetColor() = 0;
+	virtual float GetFloat() = 0;
 
 	virtual void SetDisplayName(std::string const& display_name) = 0;
 	virtual void SetVisibilty(bool const& _value) = 0;
@@ -627,14 +681,17 @@ public:
 	virtual void SetBool(bool const& _value) = 0;
 	virtual void SetInt(int const& _value) = 0;
 	virtual void SetColor(uint32_t const& _value) = 0;
+	virtual void SetFloat(float const _value) = 0;
+
 };
 
 class IMenu
 {
 public:
 	virtual void Remove() = 0;
-	
+
 	virtual IMenuElement* AddSlider(std::string const& display_name, std::string const& key, int default_value, int min_value, int max_value, bool visible_in_menu = true) = 0;
+	virtual IMenuElement* AddSliderF(std::string const& display_name, std::string const& key, float default_value, float min_value, float max_value, const char* format = nullptr, bool visible_in_menu = true) = 0;
 	virtual IMenuElement* AddCheckBox(std::string const& display_name, std::string const& key, bool default_value, bool visible_in_menu = true) = 0;
 	virtual IMenuElement* AddKeybind(std::string const& display_name, std::string const& key, int vkey, bool default_value, KeybindType type, bool visible_in_menu = true) = 0;
 	virtual IMenuElement* AddComboBox(std::string const& display_name, std::string const& key, std::vector<std::string> const& names, int default_value, bool visible_in_menu = true) = 0;
@@ -648,7 +705,8 @@ public:
 	virtual IMenu* GetSubMenu(std::string const& key) = 0;
 
 	virtual std::vector<IMenuElement*> GetElements() = 0;
-	virtual bool ElementExists(std::string const& key) = 0;};
+	virtual bool ElementExists(std::string const& key) = 0;
+};
 
 class IMainMenu
 {
@@ -663,19 +721,6 @@ public:
 class ICommon
 {
 public:
-	// Target selector
-	virtual IGameObject* GetTarget(float range, DamageType damage_type) = 0;
-
-	// Prediction
-	virtual IPredictionOutput GetPrediction(IGameObject * unit, float range, float delay, float radius, float speed, int eCollisionFlags, Vector from) = 0;
-	virtual IPredictionOutput GetPrediction(IGameObject * unit, float delay) = 0;
-	virtual IPredictionOutput GetPrediction(IPredictionInput * prediction_input) = 0;
-
-	// Damage Library
-	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageInput* input) = 0;
-	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageType damage_type, float raw_damage) = 0;
-	virtual float GetSpellDamage(IGameObject* from, IGameObject* target, SpellSlot slot, bool return_raw_damage) = 0;
-
 	virtual void DelayAction(int time, std::function<void()> function) = 0;
 
 	virtual bool IsWindowFocused() = 0;
@@ -710,7 +755,24 @@ public:
 	virtual bool GetItemSpellSlot(ItemId item_id, SpellSlot& out_slot) = 0;
 
 	virtual void ApplyGlow(IGameObject* object, int r, int g, int b, int a, int thickness, int blur) = 0;
-	virtual void ApplyGlow(IGameObject* object, unsigned int color, int thickness, int blur) = 0;
+	virtual void ApplyGlow(IGameObject* object, uint32_t color, int thickness, int blur) = 0;
+
+	// Returns spell for easier casting, running prediction etc.
+	virtual std::shared_ptr<ISpell> AddSpell(SpellSlot spell_slot, float range = FLT_MAX) = 0;
+
+	// Prediction
+	virtual IPredictionOutput GetPrediction(IGameObject* unit, float range, float delay, float radius, float speed, eCollisionFlags collisionFlags, Vector from) = 0;
+	virtual IPredictionOutput GetPrediction(IGameObject* unit, float delay) = 0;
+	virtual IPredictionOutput GetPrediction(IPredictionInput* prediction_input) = 0;
+
+	// Target selector
+	virtual IGameObject* GetTarget(float range, DamageType damage_type) = 0;
+	virtual IGameObject* GetTargetFromCoreTS(float range, DamageType damage_type) = 0;
+
+	// Damage Library
+	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageInput* input) = 0;
+	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageType damage_type, float raw_damage) = 0;
+	virtual float GetSpellDamage(IGameObject* from, IGameObject* target, SpellSlot slot, bool return_raw_damage) = 0;
 
 	// DEPRECATED, provided for compatibility
 	void Log(const char* _fmt, ...);
@@ -745,14 +807,10 @@ public:
 	virtual float Cooldown() = 0;
 	virtual float ManaCost() = 0;
 	virtual float ChargedPercentage() = 0;
-	virtual float Damage(IGameObject* target, int stage = 0) = 0;
+	virtual float Damage(IGameObject* target) = 0;
 
-	/// <summary>
-	/// Returns spell damage including predicted(incoming) damage on a target.
-	/// </summary>
-	/// <param name="target">target.</param>
-	/// <param name="stage">stage of the spell.</param>
-	virtual float KsDamage(IGameObject* target, int stage = 0) = 0;
+	// Returns spell damage including predicted(incoming) damage on a target.
+	virtual float KsDamage(IGameObject* target) = 0;
 
 	virtual int Ammo() = 0;
 	virtual int ToogleState() = 0;
@@ -777,14 +835,32 @@ class ILogSystem
 {
 public:
 	virtual void ToggleOutputToFile(bool _log_to_file) = 0;
-	
+
 	virtual void Print(const char* _fmt, ...) = 0;
 	virtual void Print(uint32_t _color, const char* _fmt, ...) = 0;
 	virtual void PrintToFile(const char* _fmt, ...) = 0;
-	
+
 	virtual void PrintVA(const char* _fmt, va_list _va) = 0;
 	virtual void PrintVA(uint32_t _color, const char* _fmt, va_list _va) = 0;
 	virtual void PrintToFileVA(const char* _fmt, va_list _va) = 0;
+};
+
+// This can be used to fix possibly outdated library inside the Core, if needed.
+class IDamageLibraryAPI
+{
+public:
+	virtual float GetAutoAttackDamage(IGameObject* source, IGameObject* target, bool respect_passives = true) = 0;
+	virtual float GetSpellDamage(IGameObject* source, IGameObject* target, SpellSlot slot, bool return_raw_damage = false) = 0;
+	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageInput* input) = 0;
+};
+
+// This can be used to limit requests sent to the server
+class IRateLimiterAPI
+{
+public:
+	virtual bool AllowOnTickCallback() = 0;
+	virtual bool AllowIssueOrder(IssueOrderType type, const Vector* position, IGameObject* target, bool is_attack_move, bool is_pet_command) = 0;
+	virtual bool AllowCastSpell(SpellSlot spell_slot, const Vector* from_position, const Vector* target_position, const IGameObject* target) = 0;
 };
 
 class IPluginsSDK
@@ -804,78 +880,66 @@ public:
 	virtual IItemManager* GetItemManager() = 0;
 	virtual ILogSystem* GetLogSystem() = 0;
 
-	/// <summary>
-	/// Returns spell for easier casting, running prediction etc. You need to delete that instance in OnUnloadSDK callback
-	/// </summary>
-	virtual ISpell* AddSpell(SpellSlot spell_slot, float range = FLT_MAX) = 0;
-
-	/// <summary>
-	/// Deletes spell instance from memory
-	/// </summary>
-	virtual void DeleteSpell(ISpell* spell_instance) = 0;
-
-	virtual void RegisterPredictionOverride(std::string const& prediction_name, IPredictionOutput(__cdecl* callback)(IPredictionInput*)) = 0;
-	virtual void UnRegisterPredictionOverride(IPredictionOutput(__cdecl* callback)(IPredictionInput*)) = 0;
+	virtual IDamageLibraryAPI* GetCoreDamageLib() = 0;
 
 	virtual void AddEventHandler(Events e, void* callback) = 0;
 	virtual void RemoveEventHandler(Events e, void* callback) = 0;
 
-	virtual void SetPluginName(const char* _name) = 0;
-	virtual void SetPluginAuthor(const char* _name) = 0;
+	//	API to override some parts of Core internals
+	// Register funcs can return true/false depending on if given name/callback/instance is already registered.
+	// Force functions will force the certain setting for this game session, but do not override the default library in config.
+	// These can be used if your champion plugin requires special logic, but it wouldn't work for other champs.
+	using PredictionCallbackFn = IPredictionOutput(__cdecl*)(IPredictionInput* input);
+	virtual bool RegisterPredictionOverride(std::string const& prediction_name, PredictionCallbackFn callback) = 0;
+	virtual void RemovePredictionOverride(PredictionCallbackFn callback) = 0;
+	virtual void ForcePredictionOverride(PredictionCallbackFn callback) = 0;
+	virtual std::pair<std::string, PredictionCallbackFn> GetCurrentPredictionCallback() = 0; // Returns nullptr if there are none registered
+
+	using TargetSelectorCallbackFn = IGameObject*(__cdecl*)(float range, DamageType damage_type);
+	virtual bool RegisterTargetSelectorOverride(std::string const& ts_name, TargetSelectorCallbackFn callback) = 0;
+	virtual void RemoveTargetSelectorOverride(TargetSelectorCallbackFn calllback) = 0;
+	virtual void ForceTargetSelectorOverride(TargetSelectorCallbackFn callback) = 0;
+	virtual std::pair<std::string, TargetSelectorCallbackFn> GetCurrentTargetSelectorCallback() = 0; // Returns nullptr if there are none registered
+
+	virtual bool RegisterDamageLibrary(std::string const& lib_name, IDamageLibraryAPI* instance) = 0;
+	virtual void RemoveDamageLibrary(IDamageLibraryAPI* instance) = 0;
+	virtual void ForceDamageLibraryOverride(IDamageLibraryAPI* instance) = 0;
+	virtual std::pair<std::string, IDamageLibraryAPI*> GetCurrentDamageLibrary() = 0; // Returns internal damage lib instance if there are none registered
+
+	virtual bool RegisterRateLimiter(std::string const& lib_name, IRateLimiterAPI* instance) = 0;
+	virtual void RemoveRateLimiter(IRateLimiterAPI* instance) = 0;
+	virtual void ForceRateLimiter(IRateLimiterAPI* instance) = 0;
+	virtual std::pair<std::string, IRateLimiterAPI*> GetCurrentRateLimiterLibrary() = 0; // Returns nullptr if there are none registered
 };
 
 struct IHeroStats
 {
-    float TotalMinionsKilled;
-    float MinionsKilled;
-    float NeturalMinionKilled;
-    int ChampionsKilled;
-    int DeathsNum;
-    int Assists;
+	float TotalMinionsKilled;
+	float MinionsKilled;
+	float NeturalMinionKilled;
+	int ChampionsKilled;
+	int DeathsNum;
+	int Assists;
 };
 
 struct IPerk
 {
-    int Id;
-    std::string Name;
+	int Id;
+	std::string Name;
 };
 
 struct IItemData
 {
-    std::string ItemName;
+	std::string ItemName;
 
-    float Price;
-    float Stacks;
-    float ScaleBonus;
+	float Price;
+	float Stacks;
+	float ScaleBonus;
 
-    byte ItemCount;
-    byte Ammo;
+	byte ItemCount;
+	byte Ammo;
 
-    ItemId ItemId;
-};
-
-struct IBuffInstance
-{
-	std::string Name;
-	std::string DisplayName;
-
-	bool Valid;
-	bool Alive;
-	bool Permanent;
-
-	float RemainingTime;
-	int Count;
-	int MaxCount;
-
-	IGameObject* Caster;
-	IGameObject* Owner;
-
-	BuffType Type;
-
-	float StartTime;
-	float EndTime;
-
-	uint32_t NameHash;
+	ItemId ItemId;
 };
 
 struct ISkinInfo
@@ -887,29 +951,29 @@ struct ISkinInfo
 
 struct ISpellData
 {
-    std::string SpellName;
+	std::string SpellName;
 
-    bool IsToggleSpell;
-    bool CantCancelWhileWindingUp;
-    bool CantCancelWhileChanneling;
-    bool DoesntBreakChannels;
-    bool CantCastWhileRooted;
-    bool CannotBeSuppressed;
-    bool CanMoveWhileChanneling;
-    bool DoNotNeedToFaceTarget;
-    bool SpellRevealsChampion;
+	bool IsToggleSpell;
+	bool CantCancelWhileWindingUp;
+	bool CantCancelWhileChanneling;
+	bool DoesntBreakChannels;
+	bool CantCastWhileRooted;
+	bool CannotBeSuppressed;
+	bool CanMoveWhileChanneling;
+	bool DoNotNeedToFaceTarget;
+	bool SpellRevealsChampion;
 
-    float MissileSpeed;
-    float LineWidth;
+	float MissileSpeed;
+	float LineWidth;
 
-    std::array<float, 6> Cooldown;
-    std::array<float, 6> CastRadius;
-    std::array<float, 6> CastRadiusSecondary;
-    std::array<float, 6> CastRange;
-    std::array<float, 6> CastRangeDisplayOverride;
-    std::array<float, 6> ManaCost;
+	std::array<float, 6> Cooldown;
+	std::array<float, 6> CastRadius;
+	std::array<float, 6> CastRadiusSecondary;
+	std::array<float, 6> CastRange;
+	std::array<float, 6> CastRangeDisplayOverride;
+	std::array<float, 6> ManaCost;
 
-    SpellTargeting TargetingType;
+	SpellTargeting TargetingType;
 
 	float CastFrame;
 	bool IgnoreAnimContinueUntilCastFrame;
@@ -917,40 +981,40 @@ struct ISpellData
 
 struct ICharacterData
 {
-    std::string BaseSkinName;
+	std::string BaseSkinName;
 
-    float BaseHealth;
-    float HealthPerLevel;
-    float BaseHealthRegen;
-    float HealthRegenPerLevel;
-    float BaseMana;
-    float ManaPerLevel;
-    float BaseManaRegen;
-    float ManaRegenPerLevel;
-    float BaseAttackDamage;
-    float AttackDamagePerLevel;
-    float BaseArmor;
-    float ArmorPerLevel;
-    float BaseSpellBlock;
-    float SpellBlockPerLevel;
-    float BaseMovementSpeed;
-    float BaseAttackRange;
-    float BaseAttackSpeed;
-    float AttackSpeedPerLevel;
+	float BaseHealth;
+	float HealthPerLevel;
+	float BaseHealthRegen;
+	float HealthRegenPerLevel;
+	float BaseMana;
+	float ManaPerLevel;
+	float BaseManaRegen;
+	float ManaRegenPerLevel;
+	float BaseAttackDamage;
+	float AttackDamagePerLevel;
+	float BaseArmor;
+	float ArmorPerLevel;
+	float BaseSpellBlock;
+	float SpellBlockPerLevel;
+	float BaseMovementSpeed;
+	float BaseAttackRange;
+	float BaseAttackSpeed;
+	float AttackSpeedPerLevel;
 };
 
 struct DamageInput
 {
-	bool IsAutoAttack                   = FALSE;
-	bool IsCriticalAttack               = FALSE;
-	bool IsAbility                      = TRUE;
-	bool DontIncludePassives            = FALSE;
-	bool DontCalculateItemDamage        = FALSE;
-	bool IsOnHitDamage                  = FALSE;
-	bool IsTargetedAbility              = FALSE;
-	bool AppliesOnHitDamage				= FALSE;
-	bool DoesntTriggerOnHitEffects		= FALSE;
-	
+	bool IsAutoAttack = FALSE;
+	bool IsCriticalAttack = FALSE;
+	bool IsAbility = TRUE;
+	bool DontIncludePassives = FALSE;
+	bool DontCalculateItemDamage = FALSE;
+	bool IsOnHitDamage = FALSE;
+	bool IsTargetedAbility = FALSE;
+	bool AppliesOnHitDamage = FALSE;
+	bool DoesntTriggerOnHitEffects = FALSE;
+
 	float RawPhysicalDamage{};
 	float RawMagicalDamage{};
 	float RawTrueDamage{};
@@ -978,10 +1042,10 @@ struct IPredictionInput
 
 struct IPredictionOutput
 {
-    HitChance Hitchance = HitChance::Impossible;
+	HitChance Hitchance = HitChance::Impossible;
 
-    Vector CastPosition;
-    Vector UnitPosition;
+	Vector CastPosition;
+	Vector UnitPosition;
 };
 
 struct IDashData

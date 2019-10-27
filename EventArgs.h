@@ -1,90 +1,91 @@
 #pragma once
+
 #include "PluginSDK.h"
 
 struct OnProcessSpellEventArgs
 {
-    IGameObject* Target;
-    ISpellData* SpellData;
+	IGameObject* Target;
+	ISpellData* SpellData;
 
-    Vector StartPosition;
-    Vector EndPosition;
+	Vector StartPosition;
+	Vector EndPosition;
 
-    SpellSlot SpellSlot;
+	SpellSlot SpellSlot;
 
-    int32_t CastedSpellCount;
-    int32_t Level;
+	int32_t CastedSpellCount;
+	int32_t Level;
 
-    bool IsAutoAttack;
+	bool IsAutoAttack;
 };
 
 struct OnTeleportEventArgs
 {
-    enum class TeleportType : int
-    {
-        Recall,
-        SuperRecall,
-        Teleport,
-        TwistedFate,
-        Shen
-    };
+	enum class TeleportType : int
+	{
+		Recall,
+		SuperRecall,
+		Teleport,
+		TwistedFate,
+		Shen
+	};
 
-    enum class TeleportStatus : int
-    {
-        Start,
-        Finish,
-        Abort
-    };
+	enum class TeleportStatus : int
+	{
+		Start,
+		Finish,
+		Abort
+	};
 
-    TeleportType Type;
-    TeleportStatus Status;
+	TeleportType Type;
+	TeleportStatus Status;
 
-    float Start;
-    float Duration;
+	float Start;
+	float Duration;
 };
 
 struct OnStopCastEventArgs
 {
-    bool StopAnimation;
-    bool ExecuteCastFrame;
-    bool ForceStop;
-    bool DestroyMissile;
+	bool StopAnimation;
+	bool ExecuteCastFrame;
+	bool ForceStop;
+	bool DestroyMissile;
 
-    int32_t MissileNetworkdId;
-    int32_t Counter;
+	int32_t MissileNetworkdId;
+	int32_t Counter;
 };
 
 struct OnNewPathEventArgs
 {
-    bool IsDash;
-    float Speed;
+	bool IsDash;
+	float Speed;
 
-    std::vector<Vector> Path;
+	std::vector<Vector> Path;
 };
 
 struct OnCastSpellEventArgs
 {
-    SpellSlot SpellSlot;
+	SpellSlot SpellSlot;
 
-    Vector CastPointStart;
-    Vector CastPointEnd;
+	Vector CastPointStart;
+	Vector CastPointEnd;
 
-    IGameObject* Target;
+	IGameObject* Target;
 
-    bool Process;
-    bool IsUserCall;
+	bool Process;
+	bool IsUserCall;
 };
 
 struct OnIssueOrderEventArgs
 {
-    IGameObject* Target;
+	IGameObject* Target;
 
-    Vector Position;
-    IssueOrderType IssueOrderType;
+	Vector Position;
+	IssueOrderType IssueOrderType;
 
-    bool IsAttackMove;
-    bool IsPetCommand;
-    bool IsUserCall;
-    bool Process;
+	bool IsAttackMove;
+	bool IsPetCommand;
+	bool IsUserCall;
+	bool Process;
 };
 
 struct OnBuffEventArgs
@@ -96,9 +97,9 @@ struct OnBuffEventArgs
 
 struct OnWndProcEventArgs
 {
-    UINT uMsg;
-    WPARAM wParam;
-    LPARAM lParam;
+	UINT uMsg;
+	WPARAM wParam;
+	LPARAM lParam;
 };
 
 struct OnEventHandlerEventArgs
@@ -112,33 +113,33 @@ struct OnEventHandlerEventArgs
 
 struct OnPreCreateObjectEventArgs
 {
-    std::string ObjectName;
-    std::string ChampionName;
+	std::string ObjectName;
+	std::string ChampionName;
 
-    int* SkinId;
+	int* SkinId;
 };
 
 struct OnPlayAnimationEventArgs
 {
 	std::string AnimationName;
-	int AnimationHash;
+	int AnimHash;
 	bool Process;
 };
 
 struct OnUpdateChargeableSpellEventArgs
 {
-    SpellSlot SpellSlot;
-    Vector Position;
+	SpellSlot SpellSlot;
+	Vector Position;
 
-    bool IsUserCall;
-    bool ReleaseCast;
-    bool Process;
+	bool IsUserCall;
+	bool ReleaseCast;
+	bool Process;
 };
 
 struct BeforeAttackOrbwalkerArgs
 {
-    IGameObject* Target;
-    bool Process;
+	IGameObject* Target;
+	bool Process;
 };
 
 struct OnSurrenderVoteEventArgs
