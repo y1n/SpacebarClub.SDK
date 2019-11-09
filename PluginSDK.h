@@ -37,7 +37,7 @@
 */
 
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 18
+#define PLUGIN_SDK_VERSION 19
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
 	g_PluginSDK         = PLUGIN_SDK; \
@@ -496,8 +496,8 @@ public:
 	virtual IDirect3DDevice9* D3D9Device() = 0;
 
 	virtual Vector2 WorldToScreen(Vector const& world) = 0;
-	virtual void WorldToScreen(Vector* world, Vector2* screen) = 0;
-	virtual void WorldToScreen(Vector const& world, Vector2& screen) = 0;
+	virtual bool WorldToScreen(Vector* world, Vector2* screen) = 0;
+	virtual bool WorldToScreen(Vector const& world, Vector2& screen) = 0;
 
 	virtual bool IsOnScreen(Vector2* screen, int tolerance) = 0;
 	virtual bool IsOnScreen(Vector2 const& screen, int tolerance) = 0;
@@ -612,17 +612,25 @@ public:
 class IDrawing
 {
 public:
-	void virtual AddText(Vector const& point, DWORD color, int font_size, const char* format, ...) = 0;
-	void virtual AddText(Vector const& point, DWORD color, text_flags flags, int font_size, const char* format, ...) = 0;
-	void virtual AddTextOnScreen(Vector2 const& point, DWORD color, int font_size, const char* format, ...) = 0;
-	void virtual AddTextOnScreen(Vector2 const& point, DWORD color, text_flags flags, int font_size, const char* format, ...) = 0;
-	void virtual AddLine(Vector const& start, Vector const& end, DWORD color, float thickness = 1.0f) = 0;
-	void virtual AddLineOnScreen(Vector2 const& start, Vector2 const& end, DWORD color, float thickness = 1.0f) = 0;
-	void virtual AddCircle(Vector const& center, float radius, DWORD color, float thickness = 1.0f, int num_segments = 120) = 0;
+	void virtual AddText(Vector const& point, uint32_t color, int font_size, const char* format, ...) = 0;
+	void virtual AddText(Vector const& point, uint32_t color, text_flags flags, int font_size, const char* format, ...) = 0;
+
+	void virtual AddTextOnScreen(Vector2 const& point, uint32_t color, int font_size, const char* format, ...) = 0;
+	void virtual AddTextOnScreen(Vector2 const& point, uint32_t color, text_flags flags, int font_size, const char* format, ...) = 0;
+
+	void virtual AddLine(Vector const& start, Vector const& end, uint32_t color, float thickness = 1.0f) = 0;
+	void virtual AddLineOnScreen(Vector2 const& start, Vector2 const& end, uint32_t color, float thickness = 1.0f) = 0;
+
+	void virtual AddPolyline(Vector const* start, int points_num, uint32_t color, float thickness = 1.0f) = 0;
+	void virtual AddPolylineOnScreen(Vector2 const* start, int points_num, uint32_t color, float thickness = 1.0f) = 0;
+
+	void virtual AddCircle(Vector const& center, float radius, uint32_t color, float thickness = 1.0f, int num_segments = 80) = 0;
+	void virtual AddCircleOnScreen(Vector2 const& screen_pos, float radius, uint32_t color, float thickness, int num_segments = 80) = 0;
+
+	void virtual AddRectOnScreen(const Vector2& pos, const Vector2& size, uint32_t color) = 0;
+	void virtual AddFilledRectOnScreen(const Vector2& pos, const Vector2& size, uint32_t color) = 0;
+
 	void virtual AddImage(uintptr_t* user_texture_id, const Vector2& pos, const Vector2& size, float rounding = 0.0f, const Vector2& uv0 = Vector2(0, 0), const Vector2& uv1 = Vector2(1, 1), const Vector4& tint_col = Vector4(1, 1, 1, 1), const Vector4& border_col = Vector4(0, 0, 0, 0)) = 0;
-	void virtual AddRectOnScreen(const Vector2& pos, const Vector2& size, DWORD color) = 0;
-	void virtual AddFilledRectOnScreen(const Vector2& pos, const Vector2& size, DWORD color) = 0;
-	void virtual AddCircleOnScreen(Vector2 const& screen_pos, float radius, DWORD color, float thickness, int num_segments) = 0;
 };
 
 class IOrbwalker
