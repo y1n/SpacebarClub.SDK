@@ -782,6 +782,9 @@ public:
 	virtual float CalculateDamageOnUnit(IGameObject* source, IGameObject* target, DamageType damage_type, float raw_damage) = 0;
 	virtual float GetSpellDamage(IGameObject* from, IGameObject* target, SpellSlot slot, bool return_raw_damage) = 0;
 
+	// Returns Object that's seleceted by "Focus Target" option from Core TS
+	virtual IGameObject* GetSelectedTarget() = 0;
+
 	// DEPRECATED, provided for compatibility
 	void Log(const char* _fmt, ...);
 };
