@@ -785,6 +785,8 @@ public:
 	// Returns Object that's seleceted by "Focus Target" option from Core TS
 	virtual IGameObject* GetSelectedTarget() = 0;
 
+	virtual int GetDragonBuffCount(GameObjectTeam Team, eDragonIds DragonType) = 0;
+		
 	// DEPRECATED, provided for compatibility
 	void Log(const char* _fmt, ...);
 };

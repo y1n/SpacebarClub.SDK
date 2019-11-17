@@ -782,3 +782,13 @@ enum class ItemId
 	Innervating_Locket = 4402,
 	Stat_Stick_of_Stoicism = 4403
 };
+
+enum class eDragonIds : int
+{
+	Infernal = 1,
+	Cloud = 2,
+	Ocean = 3,
+	Mountain = 4,
+	Elder = 5
+};
+
