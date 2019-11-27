@@ -37,7 +37,7 @@
 */
 
 #define PLUGIN_API	extern "C" __declspec(dllexport)
-#define PLUGIN_SDK_VERSION 19
+#define PLUGIN_SDK_VERSION 20
 
 #define DECLARE_GLOBALS(PLUGIN_SDK) \
 	g_PluginSDK         = PLUGIN_SDK; \
@@ -62,29 +62,30 @@ bool StringContains(const char* strA, const char* strB, bool ignore_case = FALSE
 bool StringEquals(const char* strA, const char* strB, bool ignore_case = FALSE);
 
 #pragma warning( push )
-#pragma warning( disable : 4018)
-// FNV hash algorithm, use for buffs
-constexpr uint32_t inline const hash(const char* str)
-{
-	uint32_t hash = 0x811C9DC5;
-	uint32_t len = 0;
-
-	while (str[len] != '\0')
-		len++;
-
-	for (auto i = 0; i < len; ++i)
+	#pragma warning( disable : 4018)
+	// FNV hash algorithm, use for buffs
+	constexpr uint32_t inline const fnv_hash(const char* str)
 	{
-		char current = str[i];
-		char current_upper = current + 0x20;
+		uint32_t hash = 0x811C9DC5;
+		uint32_t len = 0;
 
-		if (static_cast<uint8_t>(current - 0x41) > 0x19u)
-			current_upper = current;
+		while (str[len] != '\0')
+			len++;
 
-		hash = 16777619 * (hash ^ current_upper);
+		for (auto i = 0; i < len; ++i)
+		{
+			char current = str[i];
+			char current_upper = current + 0x20;
+
+			if (static_cast<uint8_t>(current - 0x41) > 0x19u)
+				current_upper = current;
+
+			hash = 16777619 * (hash ^ current_upper);
+		}
+
+		return hash;
 	}
-
-	return hash;
-}
+	#define hash(x) fnv_hash(x)
 #pragma warning( pop ) 
 
 class IGameObject;
@@ -786,7 +787,7 @@ public:
 	virtual IGameObject* GetSelectedTarget() = 0;
 
 	virtual int GetDragonBuffCount(GameObjectTeam Team, eDragonIds DragonType) = 0;
-		
+
 	// DEPRECATED, provided for compatibility
 	void Log(const char* _fmt, ...);
 };
@@ -876,6 +877,18 @@ public:
 	virtual bool AllowCastSpell(SpellSlot spell_slot, const Vector* from_position, const Vector* target_position, const IGameObject* target) = 0;
 };
 
+class IEventManager
+{
+public:
+	virtual void AddEventCallback(std::uint32_t hashed_name, void* func_address) = 0;
+	virtual void RemoveEventCallback(std::uint32_t hashed_name, void* func_address) = 0;
+
+	// Type of event (arguments) must match!
+	virtual void CallEvent(std::uint32_t hashed_name) = 0;
+	virtual void CallEvent(std::uint32_t hashed_name, void* data) = 0;
+	virtual void CallEvent(std::uint32_t hashed_name, IGameObject* sender, void* data) = 0;
+};
+
 class IPluginsSDK
 {
 public:
@@ -892,11 +905,8 @@ public:
 	virtual IHealthPrediction* GetHealthPrediction() = 0;
 	virtual IItemManager* GetItemManager() = 0;
 	virtual ILogSystem* GetLogSystem() = 0;
-
 	virtual IDamageLibraryAPI* GetCoreDamageLib() = 0;
-
-	virtual void AddEventHandler(Events e, void* callback) = 0;
-	virtual void RemoveEventHandler(Events e, void* callback) = 0;
+	virtual IEventManager* GetEventManager() = 0;
 
 	//	API to override some parts of Core internals
 	// Register funcs can return true/false depending on if given name/callback/instance is already registered.
@@ -1038,27 +1048,32 @@ struct DamageInput
 struct IPredictionInput
 {
 	Vector From;
+	Vector RangeCheckFrom;
 
-	float Delay = 0;
-	float Radius = 1.0f;
+	float Delay = 0.f;
+	float Radius = 1.f;
 	float Range = FLT_MAX;
 	float Speed = FLT_MAX;
 
+	eSkillshotType Type = kSkillshotLine;
+
 	SpellSlot Slot = SpellSlot::Invalid;
-	IGameObject* Target;
+	IGameObject* Target = nullptr;
 
 	bool UseBoundingRadius = true;
-
-	eSkillshotType Type = kSkillshotLine;
-	eCollisionFlags CollisionFlags = kCollidesWithNothing;
+	bool Aoe = true;
+	bool Collision = true;
+	eCollisionFlags CollisionFlags = kCollidesWithYasuoWall;
 };
 
 struct IPredictionOutput
 {
-	HitChance Hitchance = HitChance::Impossible;
-
+	IPredictionInput* PredictionInput;
+	HitChance Hitchance;
 	Vector CastPosition;
 	Vector UnitPosition;
+	std::vector<IGameObject*> AoeTargetsHit;
+	std::vector<IGameObject*> CollisionObjects;
 };
 
 struct IDashData

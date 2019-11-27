@@ -78,17 +78,13 @@ enum class Events : int32_t
 	OnIssueOrder,
 	OnNewPath,
 	OnPlayAnimation,
-	OnCryptString,
 	OnPreCreateObject,
 	OnStopCast,
 	OnTeleport,
-	OnTurretRange,
 	OnUpdateChargeableSpell,
 	OnGlowRender,
-	OnMenuDraw,
 	OnBeforeAttackOrbwalker,
 	OnAfterAttackOrbwalker,
-	OnSurrenderVote,
 	OnEventHandler
 };
 
@@ -791,4 +787,3 @@ enum class eDragonIds : int
 	Mountain = 4,
 	Elder = 5
 };
-
