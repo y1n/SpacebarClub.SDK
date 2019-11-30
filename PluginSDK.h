@@ -26,11 +26,11 @@
 	   Champion target is used for filtering out unwated plugins,
 	   if exported and different than 0 the plugins will only show up
 	   on the list on correct champion.
-	
+
 	 - Plugins are also expected to export and implement these two functions:
 	 - PLUGIN_API bool OnLoadSDK(IPluginsSDK* plugin_sdk);
 	 - PLUGIN_API void OnUnloadSDK();
-	
+
 	 - Plugin MUST export SDK target version (PLUGIN_SDK_VERSION define)
 	   under name PLUGIN_TARGET_SDK, but that should be done automatically
 	   via PluginSDK.cpp. Plugins will be ignored in case of mismatch.
@@ -62,30 +62,30 @@ bool StringContains(const char* strA, const char* strB, bool ignore_case = FALSE
 bool StringEquals(const char* strA, const char* strB, bool ignore_case = FALSE);
 
 #pragma warning( push )
-	#pragma warning( disable : 4018)
-	// FNV hash algorithm, use for buffs
-	constexpr uint32_t inline const fnv_hash(const char* str)
+#pragma warning( disable : 4018)
+// FNV hash algorithm, use for buffs
+constexpr uint32_t inline const fnv_hash(const char* str)
+{
+	uint32_t _hash = 0x811C9DC5;
+	uint32_t len = 0;
+
+	while (str[len] != '\0')
+		len++;
+
+	for (auto i = 0; i < len; ++i)
 	{
-		uint32_t hash = 0x811C9DC5;
-		uint32_t len = 0;
+		char current = str[i];
+		char current_upper = current + 0x20;
 
-		while (str[len] != '\0')
-			len++;
+		if (static_cast<uint8_t>(current - 0x41) > 0x19u)
+			current_upper = current;
 
-		for (auto i = 0; i < len; ++i)
-		{
-			char current = str[i];
-			char current_upper = current + 0x20;
-
-			if (static_cast<uint8_t>(current - 0x41) > 0x19u)
-				current_upper = current;
-
-			hash = 16777619 * (hash ^ current_upper);
-		}
-
-		return hash;
+		_hash = 16777619 * (_hash ^ current_upper);
 	}
-	#define hash(x) fnv_hash(x)
+
+	return _hash;
+}
+//#define hash(x) fnv_hash(x)
 #pragma warning( pop ) 
 
 class IGameObject;
@@ -207,9 +207,9 @@ public:
 	virtual float BuffTimeLeft(const uint32_t buff_hash) = 0;
 
 	// Wrappers for easier usage
-	__forceinline IBuffInstance GetBuff(const char* BuffName) { return GetBuff(hash(BuffName)); }
-	__forceinline bool HasBuff(const char* BuffName) { return HasBuff(hash(BuffName)); }
-	__forceinline bool BuffTimeLeft(const char* BuffName) { return BuffTimeLeft(hash(BuffName)); }
+	__forceinline IBuffInstance GetBuff(const char* BuffName) { return GetBuff(fnv_hash(BuffName)); }
+	__forceinline bool HasBuff(const char* BuffName) { return HasBuff(fnv_hash(BuffName)); }
+	__forceinline bool BuffTimeLeft(const char* BuffName) { return BuffTimeLeft(fnv_hash(BuffName)); }
 
 	virtual bool HasPerk(std::string const& perk_name) = 0;
 	virtual bool HasPerk(int32_t perk_id) = 0;
@@ -425,7 +425,7 @@ public:
 	virtual std::vector<IGameObject*> GetChampions() = 0;
 	virtual std::vector<IGameObject*> GetChampions(bool Friendly) = 0;
 
-	virtual std::vector<IGameObject*> GetByType(EntityType type = EntityType::Any, std::function<bool(IGameObject* unit)> predicate = nullptr) = 0;
+	virtual std::vector<IGameObject*> GetByType(EntityType type = EntityType::Any, std::function<bool(IGameObject * unit)> predicate = nullptr) = 0;
 
 	virtual IGameObject* GetEntityByNetworkID(std::int32_t NetworkID) = 0;
 
@@ -912,13 +912,13 @@ public:
 	// Register funcs can return true/false depending on if given name/callback/instance is already registered.
 	// Force functions will force the certain setting for this game session, but do not override the default library in config.
 	// These can be used if your champion plugin requires special logic, but it wouldn't work for other champs.
-	using PredictionCallbackFn = IPredictionOutput(__cdecl*)(IPredictionInput* input);
+	using PredictionCallbackFn = IPredictionOutput(__cdecl*)(IPredictionInput * input);
 	virtual bool RegisterPredictionOverride(std::string const& prediction_name, PredictionCallbackFn callback) = 0;
 	virtual void RemovePredictionOverride(PredictionCallbackFn callback) = 0;
 	virtual void ForcePredictionOverride(PredictionCallbackFn callback) = 0;
 	virtual std::pair<std::string, PredictionCallbackFn> GetCurrentPredictionCallback() = 0; // Returns nullptr if there are none registered
 
-	using TargetSelectorCallbackFn = IGameObject*(__cdecl*)(float range, DamageType damage_type);
+	using TargetSelectorCallbackFn = IGameObject * (__cdecl*)(float range, DamageType damage_type);
 	virtual bool RegisterTargetSelectorOverride(std::string const& ts_name, TargetSelectorCallbackFn callback) = 0;
 	virtual void RemoveTargetSelectorOverride(TargetSelectorCallbackFn calllback) = 0;
 	virtual void ForceTargetSelectorOverride(TargetSelectorCallbackFn callback) = 0;
